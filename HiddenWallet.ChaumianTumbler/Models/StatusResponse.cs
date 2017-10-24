@@ -4,12 +4,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace HiddenWallet.ChaumianCoinJoin.Tumbler.Models
+namespace HiddenWallet.ChaumianTumbler.Models
 {
 	public class StatusResponse : BaseResponse
 	{
 		public StatusResponse() => Success = true;
-		public string PubKey { get; set; }
 		public string Phase { get; set; }
 		public string Denomination { get; set; }
 		public int AnonymitySet { get; set; }
