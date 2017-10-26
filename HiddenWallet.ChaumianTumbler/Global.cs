@@ -1,12 +1,10 @@
 ﻿using HiddenWallet.Helpers;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Text;
+using System.Linq;
+using System.Threading.Tasks;
 
-namespace HiddenWallet.FullSpvWallet
+namespace HiddenWallet.ChaumianTumbler
 {
 	public static class Global
 	{
@@ -17,7 +15,7 @@ namespace HiddenWallet.FullSpvWallet
 			{
 				if (_dataDir != null) return _dataDir;
 
-				_dataDir = EnvironmentHelpers.GetDataDir("HiddenWallet");
+				_dataDir = EnvironmentHelpers.GetDataDir("ChaumianTumbler");
 
 				return _dataDir;
 			}
