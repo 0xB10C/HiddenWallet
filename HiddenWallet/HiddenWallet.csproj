@@ -16,6 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Folder Include="Extensions\" />
     <Folder Include="WebClients\" />
   </ItemGroup>
 
