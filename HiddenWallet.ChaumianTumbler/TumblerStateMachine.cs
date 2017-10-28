@@ -1,5 +1,8 @@
 ﻿using HiddenWallet.ChaumianCoinJoin;
+using HiddenWallet.ChaumianTumbler.Configuration;
 using HiddenWallet.ChaumianTumbler.Models;
+using HiddenWallet.WebClients.SmartBit;
+using NBitcoin;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -12,10 +15,20 @@ namespace HiddenWallet.ChaumianTumbler
     public class TumblerStateMachine : IDisposable
     {
 		public TumblerPhase Phase { get; private set; } = TumblerPhase.InputRegistration;
+		public Money Denomination { get; private set; }
+		public int AnonymitySet { get; private set; } = (int)Global.Config.MinimumAnonymitySet;
+		public TimeSpan TimeSpentInInputRegistration { get; private set; } = TimeSpan.FromSeconds((int)Global.Config.AverageTimeToSpendInInputRegistrationInSeconds) + TimeSpan.FromSeconds(1); // took one sec longer, so the first round will use the same anonymity set
+
+		private SmartBitClient SmartBitClient { get; }
 
 		private TumblerPhaseBroadcaster _broadcaster = TumblerPhaseBroadcaster.Instance;
 
 		private CancellationTokenSource _ctsPhaseCancel = new CancellationTokenSource();
+
+		public TumblerStateMachine()
+		{
+			SmartBitClient = new SmartBitClient(Network.Main);
+		}
 
 		public void UpdatePhase(TumblerPhase phase)
 		{
@@ -72,10 +85,18 @@ namespace HiddenWallet.ChaumianTumbler
 					{
 						case TumblerPhase.InputRegistration:
 							{
+								await SetDenominationAsync(cancel);
+								CalculateAnonymitySet();
+
+								Stopwatch stopwatch = new Stopwatch();
+								stopwatch.Start();
 								using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancel, _ctsPhaseCancel.Token))
 								{
-									await Task.Delay(TimeSpan.FromSeconds(Global.Config.InputRegistrationPhaseTimeoutInSeconds), cts.Token).ContinueWith(t => { });
+									await Task.Delay(TimeSpan.FromSeconds((int)Global.Config.InputRegistrationPhaseTimeoutInSeconds), cts.Token).ContinueWith(t => { });
 								}
+								stopwatch.Stop();
+								TimeSpentInInputRegistration = stopwatch.Elapsed;
+
 								AdvancePhase();
 								break;
 							}
@@ -83,7 +104,7 @@ namespace HiddenWallet.ChaumianTumbler
 							{
 								using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancel, _ctsPhaseCancel.Token))
 								{
-									await Task.Delay(TimeSpan.FromSeconds(Global.Config.InputConfirmationPhaseTimeoutInSeconds), cts.Token).ContinueWith(t => { });
+									await Task.Delay(TimeSpan.FromSeconds((int)Global.Config.InputConfirmationPhaseTimeoutInSeconds), cts.Token).ContinueWith(t => { });
 								}
 								AdvancePhase();
 								break;
@@ -92,7 +113,7 @@ namespace HiddenWallet.ChaumianTumbler
 							{
 								using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancel, _ctsPhaseCancel.Token))
 								{
-									await Task.Delay(TimeSpan.FromSeconds(Global.Config.OutputRegistrationPhaseTimeoutInSeconds), cts.Token).ContinueWith(t => { });
+									await Task.Delay(TimeSpan.FromSeconds((int)Global.Config.OutputRegistrationPhaseTimeoutInSeconds), cts.Token).ContinueWith(t => { });
 								}
 								AdvancePhase();
 								break;
@@ -101,7 +122,7 @@ namespace HiddenWallet.ChaumianTumbler
 							{
 								using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancel, _ctsPhaseCancel.Token))
 								{
-									await Task.Delay(TimeSpan.FromSeconds(Global.Config.SigningPhaseTimeoutInSeconds), cts.Token).ContinueWith(t => { });
+									await Task.Delay(TimeSpan.FromSeconds((int)Global.Config.SigningPhaseTimeoutInSeconds), cts.Token).ContinueWith(t => { });
 								}
 								AdvancePhase();
 								break;
@@ -119,6 +140,50 @@ namespace HiddenWallet.ChaumianTumbler
 			}
 		}
 
+		private void CalculateAnonymitySet()
+		{
+			var min = (int)Global.Config.MinimumAnonymitySet;
+			var max = (int)Global.Config.MaximumAnonymitySet;
+			// If the previous non-fallback Input Registration phase took more than three minutes
+			if (TimeSpentInInputRegistration > TimeSpan.FromSeconds((int)Global.Config.AverageTimeToSpendInInputRegistrationInSeconds))
+			{
+				// decrement this round's desired anonymity set relative to the previous desired anonymity set,
+				AnonymitySet = Math.Max(min, AnonymitySet - 1);
+			}
+			else
+			{
+				// otherwise increment it
+				AnonymitySet = Math.Min(max, AnonymitySet + 1);
+			}
+		}
+
+		private async Task SetDenominationAsync(CancellationToken cancel)
+		{
+			if (Global.Config.DenominationAlgorithm == DenominationAlgorithm.FixedUSD)
+			{
+				try
+				{
+					var exchangeRates = await SmartBitClient.GetExchangeRatesAsync(cancel);
+					decimal price = exchangeRates.Single(x => x.Code == "USD").Rate;
+					decimal denominationUSD = (decimal)Global.Config.DenominationUSD;
+					decimal denominationBTC = denominationUSD / price;
+					Denomination = new Money(denominationBTC, MoneyUnit.BTC);
+				}
+				catch
+				{
+					Denomination = Global.Config.DenominationBTC;
+				}
+			}
+			else if (Global.Config.DenominationAlgorithm == DenominationAlgorithm.FixedBTC)
+			{
+				Denomination = Global.Config.DenominationBTC;
+			}
+			else
+			{
+				throw new NotSupportedException(Global.Config.DenominationAlgorithm.ToString());
+			}
+		}
+
 		#region IDisposable Support
 		private bool _disposedValue = false; // To detect redundant calls
 
@@ -129,6 +194,7 @@ namespace HiddenWallet.ChaumianTumbler
 				if (disposing)
 				{
 					_ctsPhaseCancel?.Dispose();
+					SmartBitClient?.Dispose();
 				}
 
 				// TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.

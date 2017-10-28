@@ -1,4 +1,5 @@
-﻿using HiddenWallet.Helpers;
+﻿using HiddenWallet.ChaumianTumbler.Configuration;
+using HiddenWallet.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;

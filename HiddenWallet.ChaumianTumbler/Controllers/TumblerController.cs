@@ -48,7 +48,10 @@ namespace HiddenWallet.ChaumianTumbler.Controllers
 			{
 				return new JsonResult(new StatusResponse
 				{
-					Phase = Global.StateMachine.Phase.ToString()
+					Phase = Global.StateMachine.Phase.ToString(),
+					Denomination = Global.StateMachine.Denomination.ToString(fplus: false, trimExcessZero: true),
+					AnonymitySet = Global.StateMachine.AnonymitySet,
+					TimeSpentInInputRegistrationInSeconds = (int)Global.StateMachine.TimeSpentInInputRegistration.TotalSeconds
 				});
 			}
 			catch (Exception ex)
