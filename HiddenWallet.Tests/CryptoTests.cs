@@ -76,28 +76,30 @@ namespace HiddenWallet.Tests
 		[Fact]
 		public void CanBlindSign()
 		{
-			RsaKey blindingkey = new RsaKey();
-			RsaKey signingKey = new RsaKey();
+			RsaKey key = new RsaKey();
 			BlindFactor blindFactor = null;
 			var stringToBlind = "blind me, please~!@#$%^&*()";
-			
+
 			BigInteger data = new BigInteger(Encoding.ASCII.GetBytes(stringToBlind));
 			// 1. blind data
-			BigInteger blindedData = blindingkey.PubKey.Blind(data, ref blindFactor);
+			BigInteger blindedData = key.PubKey.Blind(data, ref blindFactor);
 			// 2. sign blinded data
-			byte[] signature = signingKey.Sign(blindedData.ToByteArray(), out uint160 nonce);
+			byte[] signature = key.Sign(blindedData.ToByteArray(), out uint160 nonce);
 			// verify blinded data is properly signed
-			Assert.True(signingKey.PubKey.Verify(signature, blindedData.ToByteArray(), nonce));
+			Assert.True(key.PubKey.Verify(signature, blindedData.ToByteArray(), nonce));
 			// 3. unblind blinded data
-			BigInteger unblindedData = blindingkey.PubKey.RevertBlind(blindedData, blindFactor);
+			BigInteger unblindedData = key.PubKey.RevertBlind(blindedData, blindFactor);
 			// verify unblinded data is the same as the original data
 			Assert.Equal(data, unblindedData);
 			// verify unblinded string is the same as the original string
 			var unblindedString = Encoding.ASCII.GetString(unblindedData.ToByteArray());
 			Assert.Equal(stringToBlind, unblindedString);
-			// 4. verify original data is signed
-			var unblindedSignature = blindingkey.PubKey.RevertBlind(new BigInteger(signature), blindFactor);
-			Assert.True(signingKey.PubKey.Verify(unblindedSignature.ToByteArray(), unblindedData.ToByteArray(), nonce));
+
+			// 4. unblind sig
+			var unblindedSignature = key.PubKey.RevertBlind(new BigInteger(signature), blindFactor);
+
+			// (4.) 5. verify original data is signed
+			Assert.True(key.PubKey.Verify(unblindedSignature.ToByteArray(), unblindedData.ToByteArray(), nonce));
 		}
 	}
 }
