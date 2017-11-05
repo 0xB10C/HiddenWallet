@@ -96,7 +96,7 @@ namespace HiddenWallet.Tests
 			Assert.Equal(stringToBlind, unblindedString);
 
 			// 4. unblind sig
-			var unblindedSignature = key.PubKey.RevertBlind(new BigInteger(signature), blindFactor);
+			var unblindedSignature = key.PubKey.Unblind(new BigInteger(signature), blindFactor);
 
 			// (4.) 5. verify original data is signed
 			Assert.True(key.PubKey.Verify(unblindedSignature.ToByteArray(), unblindedData.ToByteArray(), nonce));

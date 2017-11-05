@@ -117,7 +117,7 @@ namespace HiddenWallet.Crypto
 			return Blind(ai.ModPow(_Key.Exponent, _Key.Modulus), data);
 		}
 
-		internal BigInteger Unblind(BigInteger data, BlindFactor blindFactor)
+		public BigInteger Unblind(BigInteger data, BlindFactor blindFactor)
 		{
 			if (data == null)
 				throw new ArgumentNullException(nameof(data));
